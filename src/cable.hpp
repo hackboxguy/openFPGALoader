@@ -131,6 +131,8 @@ static std::map <std::string, cable_t> cable_list = {
 	{"steppenprobe",       FTDI_SER(0x0403, 0x6010, FTDI_INTF_A, 0x58, 0xFB, 0x00, 0x99)},
 	{"tigard",             FTDI_SER(0x0403, 0x6010, FTDI_INTF_B, 0x08, 0x3B, 0x00, 0x00)},
 	{"usb-blaster",        CABLE_DEF(MODE_USBBLASTER, 0x09Fb, 0x6001                   )},
+	/* USB-Blaster I with native DO_SHIFT disabled; required by some ECP5 targets. */
+	{"usb-blaster-bitbang", {MODE_USBBLASTER, 0x09Fb, 0x6001, 0, 0, {0, 0, 0, 0, 1, 0, -1}}},
 	{"usb-blasterII",      CABLE_DEF(MODE_USBBLASTER, 0x09Fb, 0x6810                   )},
 	{"usb-blasterIII",     FTDI_SER(0x09fb, 0x6022, FTDI_INTF_A, 0x08, 0x3B, 0x00, 0x00)},
 	{"xvc-client",         CABLE_DEF(MODE_XVC_CLIENT, 0x0000, 0x0000                   )},

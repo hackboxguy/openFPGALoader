@@ -80,6 +80,7 @@ class UsbBlaster : public JtagInterface {
 
  private:
 	UsbBlaster_ll *ll_driver;
+	int writeTDI_bitbang(const uint8_t *tx, uint8_t *rx, uint32_t len, bool end);
 	int writeByte(uint8_t *tdo, int nb_byte);
 	int writeBit(uint8_t *tdo, int nb_bit);
 	int write(bool read, int rd_len);
@@ -87,6 +88,7 @@ class UsbBlaster : public JtagInterface {
 	uint8_t *_in_buf;
 
 	int8_t _verbose;
+	bool _bitbang_all;
 	uint8_t _tck_pin; /*!< tck pin: 1 << pin id */
 	uint8_t _tms_pin; /*!< tms pin: 1 << pin id */
 	uint8_t _tdi_pin; /*!< tdi pin: 1 << pin id */
