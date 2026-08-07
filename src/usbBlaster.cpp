@@ -41,7 +41,7 @@
 
 UsbBlaster::UsbBlaster(const cable_t &cable, const std::string &firmware_path,
 		int8_t verbose):
-			_verbose(verbose > 1), _nb_bit(0),
+			_verbose(verbose > 1), _bitbang_all(cable.config.bit_high_dir == 1), _nb_bit(0),
 			_curr_tms(0), _buffer_size(64),
 			_passive_serial_mode(false)
 {
@@ -153,8 +153,60 @@ int UsbBlaster::writeTMS(const uint8_t *tms, uint32_t len, bool flush_buffer,
 
 #include "configBitstreamParser.hpp"
 
+int UsbBlaster::writeTDI_bitbang(const uint8_t *tx, uint8_t *rx,
+		uint32_t len, bool end)
+{
+	/*
+	 * Opt-in USB-Blaster I fallback for ECP5 targets that do not tolerate the
+	 * cable's native DO_SHIFT transfers. It batches 24 read bits or 31 write
+	 * bits per USB request to retain practical throughput.
+	 */
+	if (rx)
+		memset(rx, 0, (len + 7) / 8);
+	if (_nb_bit != 0 && flush() < 0)
+		return -EXIT_FAILURE;
+
+	uint32_t offset = 0;
+	while (offset < len) {
+		uint32_t chunk_len = len - offset;
+		const uint32_t max_chunk = rx ? 24 : 31;
+		if (chunk_len > max_chunk)
+			chunk_len = max_chunk;
+
+		for (uint32_t bit = 0; bit < chunk_len; ++bit) {
+			const uint32_t index = offset + bit;
+			const bool last = end && (index == len - 1);
+			uint8_t value = DEFAULT | DO_BITBB |
+				(last ? _tms_pin : 0);
+			if (!rx)
+				value |= DO_WRITE;
+			if (tx && (tx[index >> 3] & (1 << (index & 0x07))))
+				value |= _tdi_pin;
+			_in_buf[_nb_bit++] = value;
+			_in_buf[_nb_bit++] = value |
+				(rx ? DO_RDWR : DO_WRITE) | _tck_pin;
+		}
+
+		if (writeBit(rx ? rx + (offset >> 3) : NULL, chunk_len) < 0)
+			return -EXIT_FAILURE;
+		offset += chunk_len;
+	}
+
+	if (end) {
+		_curr_tms = _tms_pin;
+		_in_buf[_nb_bit++] = DEFAULT | DO_BITBB | _curr_tms;
+		if (writeBit(NULL, 0) < 0)
+			return -EXIT_FAILURE;
+	}
+
+	return len;
+}
+
 int UsbBlaster::writeTDI(const uint8_t *tx, uint8_t *rx, uint32_t len, bool end)
 {
+	if (_bitbang_all)
+		return writeTDI_bitbang(tx, rx, len, end);
+
 	uint32_t real_len = (end) ? len -1 : len;
 	uint32_t nb_byte = real_len >> 3;
 	uint32_t nb_bit = (real_len & 0x07);
